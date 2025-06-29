@@ -12,18 +12,18 @@ end
 function export_script(name, raw_script)
   local scripts_dir_path = ensure_scripts_directory()
   local contents = script_decompile(raw_script)
-  local script_name = scripts_dir_path .. "/" .. name .. ".v6script"
+  local script_name = scripts_dir_path .. "/" .. name .. ".v6"
   cons("Exporting " .. name .. " to " .. script_name)
 
   if internalscript then
-    table.insert(contents, 1, "#.int.v6script")
+    table.insert(contents, 1, "#.int")
   end
   writelevelfile(script_name, table.concat(contents, "\n"))
 end
 
 function import_script(name)
   local scripts_dir_path = ensure_scripts_directory()
-  local file_name = scripts_dir_path .. "/" .. name .. ".v6script"
+  local file_name = scripts_dir_path .. "/" .. name .. ".v6"
   if file_exists(file_name) then
     local file = {
       name=script_name,
@@ -47,7 +47,7 @@ function load_file_script(file)
       table.insert(lines, ln)
     end
 
-    if lines[1] == "#.int.v6script" then
+    if lines[1] == "#.int" then
       table.remove(lines, 1)
       internalscript = true
     else
@@ -64,14 +64,14 @@ function sync_scripts()
   cons("Syncing scripts")
   local scripts_dir_path = ensure_scripts_directory(level_path)
 
-  local success, files, message = listfiles_generic(scripts_dir_path, ".v6script", true)
+  local success, files, message = listfiles_generic(scripts_dir_path, ".v6", true)
 
   local file_scripts = {}
 
   if success then
     for file_i = 1, #files do
       local file_name = files[file_i].name
-      local script_name = file_name:gsub(".v6script", "")
+      local script_name = file_name:gsub(".v6", "")
 
       file_scripts[script_name] = {
         name=script_name,

@@ -33,4 +33,4 @@ This can lead to some unexpected consequences if the same script is being edited
 
 ## Internal vs. Simplified Scripting
 
-This plugin exports scripts in human-readable formats. To differentiate between internal and simplified scripts, the header `#.int.v6script` can be used. When this is placed by itself on the first line of a script, it informs VED that the script should be compiled using the internal command system.
+This plugin exports scripts in human-readable formats. To differentiate between internal and simplified scripts, the header `#.int` can be used. When this is placed by itself on the first line of a script, it informs VED that the script should be compiled using the internal command system.
