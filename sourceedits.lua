@@ -22,7 +22,7 @@ scripts = allscripts
 scriptnames = myscriptnames
 vedmetadata = myvedmetadata
 level_path = path
-sync_scripts()
+sync_all_scripts()
 
 -- Some things that for now we'll have to hardcode carrying over...]],
 			ignore_error = false,
@@ -36,7 +36,14 @@ sync_scripts()
 if path ~= nil then
 	level_path = path
 end
-sync_scripts(path)
+if external_files_loaded == false and false then
+	cons("External files not yet loaded, syncing all scripts (fakecommands workaround)")
+	sync_all_scripts()
+	external_files_loaded = true
+else
+	cons("External files already loaded, syncing updated scripts")
+	sync_updated_scripts()
+end
 
 cons("Assembling scripts...")]],
 			ignore_error = false,
