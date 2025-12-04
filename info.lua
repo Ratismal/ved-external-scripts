@@ -15,3 +15,4 @@ Scripts are synced any time a project is loaded or saved
 are updated when opened in the VED editor.
 ]]  -- The description that will be displayed in the plugins list. This uses the help/notepad system, so you can use text formatting here, and even images!
 t.overrideinfo = false  -- Set this to true if you want to make your description fully custom and disable the default header with the plugin name, your username and the plugin version at the top. Leave at false if uncertain.
+EXSCR_PLUGIN_PATH = t.internal_pluginpath .. "/"

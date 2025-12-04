@@ -1,7 +1,7 @@
+local JSON = ved_require(EXSCR_PLUGIN_PATH .. "json")
 external_files = {}
-external_files_loaded = false
 
-function ensure_scripts_directory()
+function EXSCR_ensure_scripts_directory()
   editingmap = level_path:gsub(".vvvvvv", "")
   local asset_folder = getlevelassetsfolder()
   if asset_folder == nil then return nil end
@@ -16,7 +16,7 @@ function ensure_scripts_directory()
   return scripts_dir_path
 end
 
-function ensure_script_path(script_name, scripts_dir_path)
+function EXSCR_ensure_script_path(script_name, scripts_dir_path)
   local split_name = string.split(script_name, "/")
   if #split_name > 1 then
     local current_path = scripts_dir_path
@@ -31,11 +31,11 @@ function ensure_script_path(script_name, scripts_dir_path)
   return true
 end
 
-function export_script(name, raw_script)
-  local scripts_dir_path = ensure_scripts_directory()
+function EXSCR_export_script(name, raw_script)
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
   if scripts_dir_path == nil then return end
   local contents = script_decompile(raw_script)
-  ensure_script_path(name, scripts_dir_path)
+  EXSCR_ensure_script_path(name, scripts_dir_path)
   local script_name = scripts_dir_path .. "/" .. name .. ".v6"
   cons("Exporting " .. name .. " to " .. script_name)
 
@@ -45,8 +45,8 @@ function export_script(name, raw_script)
   writelevelfile(script_name, table.concat(contents, "\n"))
 end
 
-function import_script(name)
-  local scripts_dir_path = ensure_scripts_directory()
+function EXSCR_import_script(name)
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
   if scripts_dir_path == nil then return end
 
   local file_name = scripts_dir_path .. "/" .. name .. ".v6"
@@ -55,13 +55,13 @@ function import_script(name)
       name=script_name,
       file_name=file_name,
     }
-    local success, contents = load_file_script(file)
+    local success, contents = EXSCR_load_file_script(file)
     cons("Importing " .. name .. " from " .. file_name .. ": " .. tostring(success))
     scripts[name] = contents
   end
 end
 
-function load_file_script(file)
+function EXSCR_load_file_script(file)
   local success, contents = readlevelfile(file.file_name)
   cons("Loading script file " .. file.file_name .. ": " .. tostring(success))
 
@@ -88,7 +88,7 @@ function load_file_script(file)
   end
 end
 
-function load_all_script_files(scripts_dir_path, dir, all_files)
+function EXSCR_load_all_script_files(scripts_dir_path, dir, all_files)
   -- cons("Listing " .. scripts_dir_path .. "/" .. dir)
   local success, files, message = listfiles_generic(scripts_dir_path .. "/" .. dir, "", true)
 
@@ -96,7 +96,7 @@ function load_all_script_files(scripts_dir_path, dir, all_files)
     for i = 1, #files do
       local file = files[i]
       if file.isdir then
-        load_all_script_files(scripts_dir_path, dir .. file.name .. "/", all_files)
+        EXSCR_load_all_script_files(scripts_dir_path, dir .. file.name .. "/", all_files)
       elseif file.name:sub(-3) == ".v6" then
         local name = dir .. file.name
         -- cons("Found script file: " .. name .. " (last modified " .. table.concat(file.lastmodified, ", ") .. ")")
@@ -114,7 +114,7 @@ function load_all_script_files(scripts_dir_path, dir, all_files)
 end
 
 -- listfiles_generic returns lastmodified as a table { year, month, day, hour, minute, second }
-function compare_dates(date_a, date_b)
+function EXSCR_compare_dates(date_a, date_b)
   for i = 1, #date_a do
     if date_a[i] < date_b[i] then
       return -1
@@ -125,14 +125,44 @@ function compare_dates(date_a, date_b)
   return 0
 end
 
-function sync_updated_scripts()
+function EXSCR_get_script_cache()
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
+  if scripts_dir_path == nil then return end
+
+  local success, contents = readlevelfile(scripts_dir_path .. "/../.script_cache.json")
+  if success then
+    EXSCR_external_scripts = JSON.decode(contents)
+  end
+end
+
+function EXSCR_save_script_cache()
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
+  if scripts_dir_path == nil then return end
+
+  local new_cache = {}
+    -- Import any updated scripts
+  for k, file in pairs(EXSCR_external_scripts) do
+    new_cache[k] = {
+      lastmodified=file.lastmodified,
+    }
+  end
+
+  local success, contents = writelevelfile(scripts_dir_path .. "/../.script_cache.json", JSON.encode(new_cache))
+end
+
+function EXSCR_sync_updated_scripts()
   cons("Syncing updated scripts")
-  local scripts_dir_path = ensure_scripts_directory()
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
   if scripts_dir_path == nil then return end
 
   local file_scripts = {}
-  local files = load_all_script_files(scripts_dir_path, "", {})
+  local files = EXSCR_load_all_script_files(scripts_dir_path, "", {})
   local success = true
+
+  if FAKECOMMANDS_load ~= nil then
+    print("LOADING FAKECOMMANDS")
+    FAKECOMMANDS_load(getlevelassetsfolder())
+  end
 
   for name, file in pairs(files) do
     local file_name = file.name
@@ -140,9 +170,9 @@ function sync_updated_scripts()
 
     scriptname = script_name
 
-    local existing = external_scripts[script_name]
+    local existing = EXSCR_external_scripts[script_name]
     if existing ~= nil then
-      local comparison = compare_dates(file.lastmodified, existing.lastmodified)
+      local comparison = EXSCR_compare_dates(file.lastmodified, existing.lastmodified)
       if comparison > 0 then
         -- File is newer, import it
         file_scripts[script_name] = {
@@ -151,7 +181,7 @@ function sync_updated_scripts()
           lastmodified=file.lastmodified,
         }
 
-        external_scripts[script_name] = file_scripts[script_name]
+        EXSCR_external_scripts[script_name] = file_scripts[script_name]
       end
     else
       -- New file, import it
@@ -161,7 +191,7 @@ function sync_updated_scripts()
         lastmodified=file.lastmodified,
       }
 
-      external_scripts[script_name] = file_scripts[script_name]
+      EXSCR_external_scripts[script_name] = file_scripts[script_name]
     end
   end
 
@@ -176,38 +206,40 @@ function sync_updated_scripts()
       local file = file_scripts[k]
 
       -- Load the file, overwrite the level's script list with it
-      local success, contents = load_file_script(file)
+      local success, contents = EXSCR_load_file_script(file)
       if success then
         scripts[k] = contents
       end
 
       file_scripts[k] = nil
-    elseif external_scripts[k] == nil then
+    elseif EXSCR_external_scripts[k] == nil then
       -- No separate file exists, export the script to a new file
-      export_script(k, v)
+      EXSCR_export_script(k, v)
     end
   end
 
   -- Import any updated scripts
   for k, file in pairs(file_scripts) do
     scriptname = k
-    local success, contents = load_file_script(file)
+    local success, contents = EXSCR_load_file_script(file)
     if success then
       scripts[k] = contents
       table.insert(scriptnames, k)
     end
   end
+
+  EXSCR_save_script_cache()
 end
 
 -- Syncs all scripts in the level with external files
 -- WARNING: SLOW. Only call on load.
-function sync_all_scripts()
+function EXSCR_sync_all_scripts()
   cons("Syncing scripts")
   local level_modified_date = getmodtime(levelsfolder .. dirsep .. level_path)
   cons("Level last modified: " .. tostring(level_modified_date))
 
   external_files_loaded = false
-  local scripts_dir_path = ensure_scripts_directory()
+  local scripts_dir_path = EXSCR_ensure_scripts_directory()
   if scripts_dir_path == nil then return end
 
   if FAKECOMMANDS_load ~= nil then
@@ -217,9 +249,9 @@ function sync_all_scripts()
 
   -- local success, files, message = listfiles_generic(scripts_dir_path, true)
 
-  external_scripts = {}
+  EXSCR_external_scripts = {}
   local file_scripts = {}
-  local files = load_all_script_files(scripts_dir_path, "", {})
+  local files = EXSCR_load_all_script_files(scripts_dir_path, "", {})
   local success = true
 
   if success then
@@ -236,7 +268,7 @@ function sync_all_scripts()
         lastmodified=file.lastmodified,
       }
 
-      external_scripts[script_name] = file_scripts[script_name]
+      EXSCR_external_scripts[script_name] = file_scripts[script_name]
     end
 
     -- For each script that exists in the level file, check if a separate file exists
@@ -248,7 +280,7 @@ function sync_all_scripts()
 
         -- Load the file, overwrite the level's script list with it
         -- TODO: Check last modified time to see which is newer?
-        local success, contents = load_file_script(file)
+        local success, contents = EXSCR_load_file_script(file)
         if success then
           scripts[k] = contents
         end
@@ -256,14 +288,14 @@ function sync_all_scripts()
         file_scripts[k] = nil
       else
         -- No separate file exists, export the script to a new file
-        export_script(k, v)
+        EXSCR_export_script(k, v)
       end
     end
 
     -- Any remaining scripts in file_scripts are new, so load them and add them to the level
     for k, file in pairs(file_scripts) do
       scriptname = k
-      local success, contents = load_file_script(file)
+      local success, contents = EXSCR_load_file_script(file)
       if success then
         scripts[k] = contents
         table.insert(scriptnames, k)
