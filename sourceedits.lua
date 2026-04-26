@@ -22,6 +22,7 @@ scripts = allscripts
 scriptnames = myscriptnames
 vedmetadata = myvedmetadata
 level_path = path
+level = lvl
 EXSCR_external_scripts = {}
 EXSCR_get_script_cache()
 EXSCR_sync_updated_scripts()
@@ -54,6 +55,21 @@ cons("Assembling scripts...")]],
 	["scriptfunc"] =
 	{
 		script_compile_injection,
+		{
+			find = [[return_used_flags(usedflags, outofrangeflags)]],
+			replace = [[-- return_used_flags(usedflags, outofrangeflags)]],
+			ignore_error = false,
+			luapattern = false,
+			allowmultiple = false
+		},
+		{
+			find = [[local usedflags = {}
+local outofrangeflags = {}]],
+			replace = [[-- meow]],
+			ignore_error = true,
+			luapattern = false,
+			allowmultiple = false
+		},
 	},
 	["uis/scripteditor/draw"] =
 	{
@@ -67,10 +83,10 @@ cons("Assembling scripts...")]],
 	["uis/scripteditor/load"] =
 	{
 		{
-			find = [[newinputsys.create(INPUT.MULTILINE, "script_lines", script_decompile(scripts[scriptname]))]],
+			find = [[return function()]],
 			replace = [[
-EXSCR_import_script(scriptname)
-newinputsys.create(INPUT.MULTILINE, "script_lines", script_decompile(scripts[scriptname]))]],
+return function()
+	EXSCR_import_script(scriptname)]],
 			ignore_error = false,
 			luapattern = false,
 			allowmultiple = false,

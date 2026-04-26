@@ -1,6 +1,188 @@
 local JSON = ved_require(EXSCR_PLUGIN_PATH .. "json")
 external_files = {}
 
+function EXSCR_rename_script_line(line, pattern, toExternal)
+
+  local command, path = line:match(pattern)
+
+  if path ~= nil then
+    if not toExternal then
+      -- Translating from external script to internal script
+      if path:sub(1,1) == '.' or path:sub(1,1) == '/' then
+        local parts = explode("/", path)
+        local workingPath = explode("/", scriptname)
+
+        local name = table.remove(parts)
+        table.remove(workingPath)
+
+        local type = ''
+        if parts[1] == '.' then
+          type = ' #r:.'
+        elseif parts[1] == '' then
+          type = ' #r:/'
+        elseif parts[1] == '..' then
+          type = ' #r:..'
+        end
+
+        for k,v in pairs(parts) do
+          if v == '.' then
+          elseif v == '' then
+            workingPath = {}
+          elseif v == '..' then
+            table.remove(workingPath)
+          else
+            table.insert(workingPath, v)
+          end
+        end
+
+        table.insert(workingPath, name)
+
+        local newpath = table.concat(workingPath, '/')
+        
+        local newname = line:gsub(pattern, '%1' .. newpath) .. type
+
+        return newname
+      end
+    else
+      -- Translating from internal script to external script
+
+
+      if line:sub(-4) == '#r:.' then
+        -- Remove parts of path that match current dir
+        local parts = explode("/", path)
+        local workingPath = explode("/", scriptname)
+        local newPath = {}
+        local name = table.remove(parts)
+        table.remove(workingPath)
+
+        local startCopying
+        for i = 1, #parts do
+          if startCopying then
+            table.insert(newPath, parts[i])
+          else 
+            if parts[i] ~= workingPath[i] then
+              startCopying = true
+              table.insert(newPath, parts[i])
+            end
+          end
+        end
+        table.insert(newPath, name)
+
+        local newpath = table.concat(newPath, '/')
+        local newname = line:gsub(pattern, '%1' .. './' .. newpath):sub(1, -5)
+
+        return newname
+      elseif line:sub(-4) == '#r:/' then
+        return line:gsub(pattern, '%1' .. '/' .. path):sub(1, -5)
+      elseif line:sub(-5) == '#r:..' then
+        -- Remove parts of path that match current dir
+        local parts = explode("/", path)
+        local workingPath = explode("/", scriptname)
+        local newPath = {}
+        local name = table.remove(parts)
+        table.remove(workingPath)
+
+        local startCopying
+        for i = 1, #parts do
+          if startCopying then
+            table.insert(newPath, parts[i])
+          else 
+            if parts[i] ~= workingPath[i] then
+              local diff = #workingPath - i
+              for j = 1, diff do
+                table.insert(newPath, '..')
+              end
+              startCopying = true
+              table.insert(newPath, parts[i])
+            end
+          end
+        end
+        table.insert(newPath, name)
+
+        local newpath = table.concat(newPath, '/')
+        local newname = line:gsub(pattern, '%1' .. '../' .. newpath):sub(1, -6)
+
+        return newname
+      end
+    end
+  end
+end
+
+function EXSCR_preprocess_script(lines, toExternal)
+  local field3cmds = {"iftrinkets", "customiftrinkets", "iftrinketsless", "customiftrinketsless", "ifflag", "customifflag"}
+  local field3intcmds = {"ifcrewlost", "iflast"}
+  local field2intcmds = {"loadscript", "ifskip"}
+  local field4intcmds = {"ifexplored"}
+  local field5cmds = {"ifwarp"}
+
+  local oldname = '([^%(,%)]-[%(,%)])'
+
+  for k,v in pairs(lines) do
+    v = v:gsub(" ", "")
+    local replaced = false
+    for _,command in pairs(field3cmds) do
+      if #v > #command then
+        local pattern = "^(" .. command .. "[%(,%)][^%(,%)]-[%(,%)])" .. oldname
+        tmp = EXSCR_rename_script_line(v, pattern, toExternal)
+        if tmp ~= nil then
+          lines[k] = tmp
+            replaced = true
+        end
+      end
+    end
+    if not replaced then
+      for _, command in pairs(field3intcmds) do
+        if #v > #command then
+          local pattern = "^(" .. command .. "[%(,%)][^%(,%)]-[%(,%)]custom_)" .. oldname
+          tmp = EXSCR_rename_script_line(v, pattern, toExternal)
+          if tmp ~= nil then
+            lines[k] = tmp
+            replaced = true
+          end
+        end
+      end
+    end
+    if not replaced then
+      for _, command in pairs(field2intcmds) do
+        if #v > #command then
+          local pattern = "^(" .. command .. "[%(,%)]custom_)" .. oldname
+          tmp = EXSCR_rename_script_line(v, pattern, toExternal)
+          if tmp ~= nil then
+            lines[k] = tmp
+            replaced = true
+          end
+        end
+      end
+    end
+    if not replaced then
+      for _, command in pairs(field4intcmds) do
+        if #v > #command then
+          local pattern = "^(" .. command .. "[%(,%)][^%(,%)]-[%(,%)][^%(,%)]-[%(,%)]custom_)" .. oldname
+          tmp = EXSCR_rename_script_line(v, pattern, toExternal)
+          if tmp ~= nil then
+            lines[k] = tmp
+            replaced = true
+          end
+        end
+      end
+    end
+    if not replaced then
+      for _, command in pairs(field5cmds) do
+        if #v > #command then
+          local pattern = "^(" .. command .. "[%(,%)][^%(,%)]-[%(,%)][^%(,%)]-[%(,%)][^%(,%)]-[%(,%)])" .. oldname
+          tmp = EXSCR_rename_script_line(v, pattern, toExternal)
+          if tmp ~= nil then
+            lines[k] = tmp
+            replaced = true
+          end
+        end
+      end
+    end
+  end
+
+  return lines
+end
+
 function EXSCR_ensure_scripts_directory()
   editingmap = level_path:gsub(".vvvvvv", "")
   local asset_folder = getlevelassetsfolder()
@@ -17,7 +199,7 @@ function EXSCR_ensure_scripts_directory()
 end
 
 function EXSCR_ensure_script_path(script_name, scripts_dir_path)
-  local split_name = string.split(script_name, "/")
+  local split_name = explode("/", script_name)
   if #split_name > 1 then
     local current_path = scripts_dir_path
     for i = 1, #split_name - 1 do
@@ -35,6 +217,7 @@ function EXSCR_export_script(name, raw_script)
   local scripts_dir_path = EXSCR_ensure_scripts_directory()
   if scripts_dir_path == nil then return end
   local contents = script_decompile(raw_script)
+  EXSCR_preprocess_script(contents, true)
   EXSCR_ensure_script_path(name, scripts_dir_path)
   local script_name = scripts_dir_path .. "/" .. name .. ".v6"
   cons("Exporting " .. name .. " to " .. script_name)
@@ -57,11 +240,12 @@ function EXSCR_import_script(name)
     }
     local success, contents = EXSCR_load_file_script(file)
     cons("Importing " .. name .. " from " .. file_name .. ": " .. tostring(success))
-    scripts[name] = contents
+    level.scripts[name] = contents
   end
 end
 
 function EXSCR_load_file_script(file)
+  local start = love.timer.getTime()
   local success, contents = readlevelfile(file.file_name)
   cons("Loading script file " .. file.file_name .. ": " .. tostring(success))
 
@@ -82,7 +266,16 @@ function EXSCR_load_file_script(file)
       internalscript = false
     end
 
-    return script_compile(lines)
+    lines = EXSCR_preprocess_script(lines, false)
+
+    local b1 = love.timer.getTime() - start
+    cons("Loaded files: " .. tostring(b1 * 1000))
+
+    start = love.timer.getTime()
+    local s, c = script_compile(lines)
+    local b2 = love.timer.getTime() - start
+    cons("COmpiled scripts: " .. tostring(b2 * 1000))
+    return s, c
   else
     return false, contents
   end
@@ -195,9 +388,11 @@ function EXSCR_sync_updated_scripts()
     end
   end
 
+  EXSCR_loadflags()
+
   -- For each script that exists in the level file, check if a separate file exists
-  for script_i = 1, #scriptnames do
-    local k, v = scriptnames[script_i], scripts[scriptnames[script_i]]
+  for script_i = 1, #level.scriptnames do
+    local k, v = level.scriptnames[script_i], level.scripts[level.scriptnames[script_i]]
     -- print("\n=======================\nChecking script " .. k)
     -- print(table.concat(v, "\n"))
     scriptname = k
@@ -208,7 +403,7 @@ function EXSCR_sync_updated_scripts()
       -- Load the file, overwrite the level's script list with it
       local success, contents = EXSCR_load_file_script(file)
       if success then
-        scripts[k] = contents
+        level.scripts[k] = contents
       end
 
       file_scripts[k] = nil
@@ -218,17 +413,25 @@ function EXSCR_sync_updated_scripts()
     end
   end
 
+  EXSCR_loadflags()
+
   -- Import any updated scripts
   for k, file in pairs(file_scripts) do
     scriptname = k
     local success, contents = EXSCR_load_file_script(file)
     if success then
-      scripts[k] = contents
-      table.insert(scriptnames, k)
+      level.scripts[k] = contents
+      table.insert(level.scriptnames, k)
     end
   end
 
   EXSCR_save_script_cache()
+end
+
+function EXSCR_loadflags()
+  usedflags = {}
+	outofrangeflags = {}
+	return_used_flags(usedflags, outofrangeflags)
 end
 
 -- Syncs all scripts in the level with external files
@@ -271,9 +474,11 @@ function EXSCR_sync_all_scripts()
       EXSCR_external_scripts[script_name] = file_scripts[script_name]
     end
 
+    EXSCR_loadflags()
+
     -- For each script that exists in the level file, check if a separate file exists
-    for script_i = 1, #scriptnames do
-      local k, v = scriptnames[script_i], scripts[scriptnames[script_i]]
+    for script_i = 1, #level.scriptnames do
+      local k, v = level.scriptnames[script_i], scripts[level.scriptnames[script_i]]
       scriptname = k
       if file_scripts[k] ~= nil then
         local file = file_scripts[k]
@@ -292,13 +497,15 @@ function EXSCR_sync_all_scripts()
       end
     end
 
+    EXSCR_loadflags()
+
     -- Any remaining scripts in file_scripts are new, so load them and add them to the level
     for k, file in pairs(file_scripts) do
       scriptname = k
       local success, contents = EXSCR_load_file_script(file)
       if success then
-        scripts[k] = contents
-        table.insert(scriptnames, k)
+        level.scripts[k] = contents
+        table.insert(level.scriptnames, k)
       end
     end
   else
