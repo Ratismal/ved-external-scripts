@@ -184,6 +184,7 @@ function EXSCR_preprocess_script(lines, toExternal)
 end
 
 function EXSCR_ensure_scripts_directory()
+  if level_path == nil then return nil end
   editingmap = level_path:gsub(".vvvvvv", "")
   local asset_folder = getlevelassetsfolder()
   if asset_folder == nil then return nil end
