@@ -2,6 +2,8 @@ local JSON = ved_require(EXSCR_PLUGIN_PATH .. "json")
 external_files = {}
 
 function EXSCR_ensure_scripts_directory()
+  if level_path == nil then return nil end
+
   editingmap = level_path:gsub(".vvvvvv", "")
   local asset_folder = getlevelassetsfolder()
   if asset_folder == nil then return nil end
@@ -17,7 +19,7 @@ function EXSCR_ensure_scripts_directory()
 end
 
 function EXSCR_ensure_script_path(script_name, scripts_dir_path)
-  local split_name = string.split(script_name, "/")
+  local split_name = explode("/", script_name)
   if #split_name > 1 then
     local current_path = scripts_dir_path
     for i = 1, #split_name - 1 do
